@@ -48,7 +48,7 @@ CREATE TYPE report_type_enum AS ENUM (
 );
 
 -- =========================
--- TABLAS BASE
+-- ROLES Y USUARIOS
 -- =========================
 
 CREATE TABLE roles (
@@ -64,18 +64,23 @@ CREATE TABLE users (
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
-  CONSTRAINT fk_user_role FOREIGN KEY (role_id) REFERENCES roles(id)
+  FOREIGN KEY (role_id) REFERENCES roles(id)
 );
+
+-- =========================
+-- AUDITORÍA 
+-- =========================
 
 CREATE TABLE audit_logs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID,
   action TEXT NOT NULL,
-  entity TEXT,
+  entity_type TEXT,
   entity_id UUID,
   metadata JSONB,
+  severity TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
-  CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- =========================
@@ -89,7 +94,7 @@ CREATE TABLE doctors (
   specialization TEXT,
   license_number TEXT UNIQUE,
   is_active BOOLEAN DEFAULT TRUE,
-  CONSTRAINT fk_doctor_user FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 CREATE TABLE patients (
@@ -118,16 +123,15 @@ CREATE TABLE appointments (
   notes TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
 
-  CONSTRAINT fk_appointment_doctor FOREIGN KEY (doctor_id) REFERENCES doctors(id),
-  CONSTRAINT fk_appointment_patient FOREIGN KEY (patient_id) REFERENCES patients(id),
-  CONSTRAINT fk_created_by FOREIGN KEY (created_by) REFERENCES users(id)
+  FOREIGN KEY (doctor_id) REFERENCES doctors(id),
+  FOREIGN KEY (patient_id) REFERENCES patients(id),
+  FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
--- PREVENCIÓN DOBLE ASIGNACIÓN (CRÍTICO)
+-- PREVENCIÓN DOBLE ASIGNACIÓN
 CREATE UNIQUE INDEX unique_doctor_schedule
 ON appointments (doctor_id, date, start_time);
 
--- Índices útiles
 CREATE INDEX idx_appointment_doctor_date
 ON appointments (doctor_id, date);
 
@@ -138,8 +142,8 @@ CREATE TABLE appointment_history (
   performed_by UUID,
   created_at TIMESTAMP DEFAULT NOW(),
 
-  CONSTRAINT fk_history_appointment FOREIGN KEY (appointment_id) REFERENCES appointments(id),
-  CONSTRAINT fk_history_user FOREIGN KEY (performed_by) REFERENCES users(id)
+  FOREIGN KEY (appointment_id) REFERENCES appointments(id),
+  FOREIGN KEY (performed_by) REFERENCES users(id)
 );
 
 -- =========================
@@ -155,8 +159,8 @@ CREATE TABLE medical_records (
   source medical_record_source_enum,
   created_at TIMESTAMP DEFAULT NOW(),
 
-  CONSTRAINT fk_record_patient FOREIGN KEY (patient_id) REFERENCES patients(id),
-  CONSTRAINT fk_record_user FOREIGN KEY (uploaded_by) REFERENCES users(id)
+  FOREIGN KEY (patient_id) REFERENCES patients(id),
+  FOREIGN KEY (uploaded_by) REFERENCES users(id)
 );
 
 CREATE INDEX idx_medical_record_patient
@@ -169,7 +173,7 @@ CREATE TABLE risk_classifications (
   score NUMERIC,
   created_at TIMESTAMP DEFAULT NOW(),
 
-  CONSTRAINT fk_risk_record FOREIGN KEY (medical_record_id) REFERENCES medical_records(id)
+  FOREIGN KEY (medical_record_id) REFERENCES medical_records(id)
 );
 
 -- =========================
@@ -184,8 +188,8 @@ CREATE TABLE treatments (
   status treatment_status_enum DEFAULT 'ACTIVE',
   created_at TIMESTAMP DEFAULT NOW(),
 
-  CONSTRAINT fk_treatment_patient FOREIGN KEY (patient_id) REFERENCES patients(id),
-  CONSTRAINT fk_treatment_doctor FOREIGN KEY (doctor_id) REFERENCES doctors(id)
+  FOREIGN KEY (patient_id) REFERENCES patients(id),
+  FOREIGN KEY (doctor_id) REFERENCES doctors(id)
 );
 
 CREATE INDEX idx_treatment_patient
@@ -193,13 +197,13 @@ ON treatments (patient_id);
 
 CREATE TABLE treatment_approvals (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  treatment_id UUID UNIQUE NOT NULL,
+  treatment_id UUID NOT NULL,
   approved_by UUID,
   notes TEXT,
   approved_at TIMESTAMP DEFAULT NOW(),
 
-  CONSTRAINT fk_approval_treatment FOREIGN KEY (treatment_id) REFERENCES treatments(id),
-  CONSTRAINT fk_approval_user FOREIGN KEY (approved_by) REFERENCES users(id)
+  FOREIGN KEY (treatment_id) REFERENCES treatments(id),
+  FOREIGN KEY (approved_by) REFERENCES users(id)
 );
 
 CREATE TABLE medication_changes (
@@ -210,12 +214,12 @@ CREATE TABLE medication_changes (
   changed_by UUID,
   created_at TIMESTAMP DEFAULT NOW(),
 
-  CONSTRAINT fk_medication_treatment FOREIGN KEY (treatment_id) REFERENCES treatments(id),
-  CONSTRAINT fk_medication_user FOREIGN KEY (changed_by) REFERENCES users(id)
+  FOREIGN KEY (treatment_id) REFERENCES treatments(id),
+  FOREIGN KEY (changed_by) REFERENCES users(id)
 );
 
 -- =========================
--- NOTIFICACIONES
+-- NOTIFICACIONES 
 -- =========================
 
 CREATE TABLE notifications (
@@ -224,13 +228,15 @@ CREATE TABLE notifications (
   type notification_type_enum,
   message TEXT,
   status notification_status_enum DEFAULT 'PENDING',
+  entity_type TEXT,
+  entity_id UUID,
   sent_at TIMESTAMP,
 
-  CONSTRAINT fk_notification_user FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- =========================
--- REPORTES
+-- REPORTES 
 -- =========================
 
 CREATE TABLE reports (
@@ -238,9 +244,11 @@ CREATE TABLE reports (
   generated_by UUID,
   type report_type_enum,
   file_url TEXT,
+  entity_type TEXT,
+  entity_id UUID,
   created_at TIMESTAMP DEFAULT NOW(),
 
-  CONSTRAINT fk_report_user FOREIGN KEY (generated_by) REFERENCES users(id)
+  FOREIGN KEY (generated_by) REFERENCES users(id)
 );
 
 -- =========================
