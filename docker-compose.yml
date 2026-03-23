@@ -1,6 +1,12 @@
-version: "3.9"
-
 services:
+
+  mailpit:
+    image: axllent/mailpit
+    container_name: aura_mailpit
+    restart: always
+    ports:
+      - "8025:8025"
+      - "1025:1025"
   postgres:
     image: postgres:15
     container_name: aura_postgres
