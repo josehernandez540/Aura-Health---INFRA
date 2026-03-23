@@ -68,7 +68,7 @@ CREATE TABLE users (
 );
 
 -- =========================
--- AUDITORÍA 
+-- AUDITORÍA
 -- =========================
 
 CREATE TABLE audit_logs (
@@ -94,6 +94,9 @@ CREATE TABLE doctors (
   specialization TEXT,
   license_number TEXT UNIQUE,
   is_active BOOLEAN DEFAULT TRUE,
+  -- Trazabilidad de cambios de estado (REQ-01)
+  status_changed_by UUID REFERENCES users(id),
+  status_changed_at TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
@@ -122,13 +125,11 @@ CREATE TABLE appointments (
   created_by UUID,
   notes TEXT,
   created_at TIMESTAMP DEFAULT NOW(),
-
   FOREIGN KEY (doctor_id) REFERENCES doctors(id),
   FOREIGN KEY (patient_id) REFERENCES patients(id),
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
--- PREVENCIÓN DOBLE ASIGNACIÓN
 CREATE UNIQUE INDEX unique_doctor_schedule
 ON appointments (doctor_id, date, start_time);
 
@@ -141,7 +142,6 @@ CREATE TABLE appointment_history (
   action TEXT NOT NULL,
   performed_by UUID,
   created_at TIMESTAMP DEFAULT NOW(),
-
   FOREIGN KEY (appointment_id) REFERENCES appointments(id),
   FOREIGN KEY (performed_by) REFERENCES users(id)
 );
@@ -158,7 +158,6 @@ CREATE TABLE medical_records (
   file_hash TEXT,
   source medical_record_source_enum,
   created_at TIMESTAMP DEFAULT NOW(),
-
   FOREIGN KEY (patient_id) REFERENCES patients(id),
   FOREIGN KEY (uploaded_by) REFERENCES users(id)
 );
@@ -172,7 +171,6 @@ CREATE TABLE risk_classifications (
   risk_level risk_level_enum,
   score NUMERIC,
   created_at TIMESTAMP DEFAULT NOW(),
-
   FOREIGN KEY (medical_record_id) REFERENCES medical_records(id)
 );
 
@@ -187,7 +185,6 @@ CREATE TABLE treatments (
   description TEXT NOT NULL,
   status treatment_status_enum DEFAULT 'ACTIVE',
   created_at TIMESTAMP DEFAULT NOW(),
-
   FOREIGN KEY (patient_id) REFERENCES patients(id),
   FOREIGN KEY (doctor_id) REFERENCES doctors(id)
 );
@@ -201,7 +198,6 @@ CREATE TABLE treatment_approvals (
   approved_by UUID,
   notes TEXT,
   approved_at TIMESTAMP DEFAULT NOW(),
-
   FOREIGN KEY (treatment_id) REFERENCES treatments(id),
   FOREIGN KEY (approved_by) REFERENCES users(id)
 );
@@ -213,13 +209,12 @@ CREATE TABLE medication_changes (
   new_medication TEXT,
   changed_by UUID,
   created_at TIMESTAMP DEFAULT NOW(),
-
   FOREIGN KEY (treatment_id) REFERENCES treatments(id),
   FOREIGN KEY (changed_by) REFERENCES users(id)
 );
 
 -- =========================
--- NOTIFICACIONES 
+-- NOTIFICACIONES
 -- =========================
 
 CREATE TABLE notifications (
@@ -231,12 +226,11 @@ CREATE TABLE notifications (
   entity_type TEXT,
   entity_id UUID,
   sent_at TIMESTAMP,
-
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
 -- =========================
--- REPORTES 
+-- REPORTES
 -- =========================
 
 CREATE TABLE reports (
@@ -247,7 +241,6 @@ CREATE TABLE reports (
   entity_type TEXT,
   entity_id UUID,
   created_at TIMESTAMP DEFAULT NOW(),
-
   FOREIGN KEY (generated_by) REFERENCES users(id)
 );
 
@@ -256,3 +249,54 @@ CREATE TABLE reports (
 -- =========================
 
 INSERT INTO roles (name) VALUES ('ADMIN'), ('DOCTOR');
+
+INSERT INTO users (id, email, password, role_id)
+SELECT uuid_generate_v4(), 'admin@aura.com',
+  '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.ucrm3/PF2',
+  r.id FROM roles r WHERE r.name = 'ADMIN';
+
+INSERT INTO users (id, email, password, role_id)
+SELECT uuid_generate_v4(), 'doctor@aura.com',
+  '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.ucrm3/PF2',
+  r.id FROM roles r WHERE r.name = 'DOCTOR';
+
+INSERT INTO doctors (id, user_id, name, specialization, license_number)
+SELECT uuid_generate_v4(), u.id, 'Dr. Juan Pérez', 'Cardiología', 'MED-123456'
+FROM users u WHERE u.email = 'doctor@aura.com';
+
+INSERT INTO patients (id, name, document_number, birth_date, phone, email) VALUES
+  (uuid_generate_v4(), 'Carlos Gómez',    '1001234567', '1990-05-10', '3001234567', 'carlos@gmail.com'),
+  (uuid_generate_v4(), 'María Rodríguez', '1007654321', '1985-09-22', '3009876543', 'maria@gmail.com');
+
+INSERT INTO appointments (id, doctor_id, patient_id, date, start_time, end_time, created_by, notes)
+SELECT uuid_generate_v4(), d.id, p.id, CURRENT_DATE, '09:00', '09:30', u.id, 'Chequeo general'
+FROM doctors d
+JOIN users u ON d.user_id = u.id
+JOIN patients p ON p.name = 'Carlos Gómez'
+LIMIT 1;
+
+INSERT INTO medical_records (id, patient_id, uploaded_by, file_url, source)
+SELECT uuid_generate_v4(), p.id, u.id, 'https://storage/aura/record1.pdf', 'INTERNAL'
+FROM patients p
+JOIN users u ON u.email = 'doctor@aura.com'
+WHERE p.name = 'Carlos Gómez'
+LIMIT 1;
+
+INSERT INTO risk_classifications (medical_record_id, risk_level, score)
+SELECT mr.id, 'MEDIUM', 65 FROM medical_records mr LIMIT 1;
+
+INSERT INTO treatments (id, patient_id, doctor_id, description)
+SELECT uuid_generate_v4(), p.id, d.id, 'Tratamiento para hipertensión'
+FROM patients p, doctors d LIMIT 1;
+
+INSERT INTO notifications (id, user_id, type, message)
+SELECT uuid_generate_v4(), u.id, 'APPOINTMENT_REMINDER', 'Tienes una cita hoy a las 9:00 AM'
+FROM users u WHERE u.email = 'doctor@aura.com';
+
+INSERT INTO reports (id, generated_by, type, file_url)
+SELECT uuid_generate_v4(), u.id, 'CLINICAL', 'https://storage/aura/report1.pdf'
+FROM users u WHERE u.email = 'admin@aura.com';
+
+ALTER TABLE patients
+ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE,
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW();
