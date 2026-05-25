@@ -131,8 +131,10 @@ CREATE TABLE patients (
   birth_date      DATE,
   phone           TEXT,
   email           TEXT,
-  is_active       BOOLEAN   DEFAULT TRUE,              -- ← agregado
-  updated_at      TIMESTAMP DEFAULT NOW(),             -- ← agregado
+  disease_count   INT DEFAULT 0,
+  risk_level      risk_level_enum DEFAULT 'LOW',
+  is_active       BOOLEAN   DEFAULT TRUE,           
+  updated_at      TIMESTAMP DEFAULT NOW(),            
   created_at      TIMESTAMP DEFAULT NOW()
 );
 
@@ -156,8 +158,9 @@ CREATE TABLE appointments (
 );
 
 -- Índice único: previene doble asignación de médico en mismo slot (crítico REQ-04)
-CREATE UNIQUE INDEX unique_doctor_schedule
-  ON appointments (doctor_id, date, start_time);
+CREATE UNIQUE INDEX unique_doctor_schedule_active
+  ON appointments (doctor_id, date, start_time)
+  WHERE status = 'SCHEDULED';
 
 CREATE INDEX idx_appointment_doctor_date
   ON appointments (doctor_id, date);
