@@ -224,8 +224,12 @@ CREATE TABLE treatments (
   description TEXT                  NOT NULL,
   status      treatment_status_enum DEFAULT 'ACTIVE',
   created_at  TIMESTAMP             DEFAULT NOW(),
+  requires_approval BOOLEAN DEFAULT FALSE,
+  approved_by UUID,
+  approved_at TIMESTAMP,
   CONSTRAINT fk_treatment_patient FOREIGN KEY (patient_id) REFERENCES patients(id),
-  CONSTRAINT fk_treatment_doctor  FOREIGN KEY (doctor_id)  REFERENCES doctors(id)
+  CONSTRAINT fk_treatment_doctor  FOREIGN KEY (doctor_id)  REFERENCES doctors(id),
+  CONSTRAINT fk_treatment_approved_by FOREIGN KEY (approved_by) REFERENCES users(id)
 );
 
 CREATE INDEX idx_treatment_patient ON treatments (patient_id);
@@ -289,6 +293,35 @@ CREATE TABLE reports (
   CONSTRAINT fk_report_user FOREIGN KEY (generated_by) REFERENCES users(id)
 );
 
+
+CREATE TABLE treatment_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    treatment_id UUID NOT NULL,
+    version INTEGER NOT NULL,
+
+    previous_description TEXT,
+    new_description TEXT NOT NULL,
+
+    previous_medications JSONB,
+    new_medications JSONB NOT NULL,
+
+    changed_by UUID NOT NULL,
+
+    change_reason TEXT,
+
+    created_at TIMESTAMP(6) DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_treatment_history_treatment FOREIGN KEY (treatment_id) REFERENCES treatments(id) ON DELETE CASCADE,
+
+    CONSTRAINT fk_treatment_history_user FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE NO ACTION
+);
+
+CREATE UNIQUE INDEX uq_treatment_history_version ON treatment_history(treatment_id, version);
+
+CREATE INDEX idx_treatment_history_treatment ON treatment_history(treatment_id);
+
+CREATE INDEX idx_treatment_history_created ON treatment_history(created_at);
 -- ================================================================
 -- 17. DATA INICIAL — Roles
 -- ================================================================
@@ -489,28 +522,31 @@ VALUES
 
 -- ── Tratamientos ──────────────────────────────────────────────────────────────
 
-INSERT INTO treatments (id, patient_id, doctor_id, description, status)
+INSERT INTO treatments (id, patient_id, doctor_id, description, status, requires_approval)
 VALUES
   (
     'e0000000-0000-4000-8000-000000000001',
     'c0000000-0000-4000-8000-000000000001',  -- María González
     'b0000000-0000-4000-8000-000000000001',  -- Dr. García
     'Tratamiento antihipertensivo con Losartán 50mg — una vez al día',
-    'ACTIVE'
+    'ACTIVE',
+    FALSE
   ),
   (
     'e0000000-0000-4000-8000-000000000002',
     'c0000000-0000-4000-8000-000000000002',  -- Juan Pérez
     'b0000000-0000-4000-8000-000000000001',  -- Dr. García
     'Control de colesterol con Atorvastatina 20mg',
-    'PENDING_APPROVAL'
+    'PENDING_APPROVAL',
+    TRUE
   ),
   (
     'e0000000-0000-4000-8000-000000000003',
     'c0000000-0000-4000-8000-000000000003',  -- Laura Rodríguez
     'b0000000-0000-4000-8000-000000000002',  -- Dra. Martínez
     'Suplementación vitamínica — vitamina D y calcio',
-    'COMPLETED'
+    'COMPLETED',
+    FALSE
   );
 
 -- ── Aprobaciones de tratamientos ─────────────────────────────────────────────
@@ -601,3 +637,12 @@ VALUES
 --   dr.martinez@aura.com → DOCTOR   → contraseña: Admin123! (debe cambiarla)
 --   dr.lopez@aura.com    → DOCTOR   → contraseña: Admin123! (inactivo)
 -- ================================================================
+
+ALTER TABLE notifications
+ADD COLUMN created_at TIMESTAMP DEFAULT NOW();
+
+ALTER TABLE notifications
+ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
+
+CREATE INDEX idx_notifications_entity
+ON notifications(entity_type, entity_id);
