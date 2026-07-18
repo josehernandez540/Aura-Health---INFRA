@@ -60,6 +60,8 @@ CREATE TYPE notification_status_enum AS ENUM ('PENDING', 'SENT', 'FAILED');
 
 CREATE TYPE medical_record_source_enum AS ENUM ('INTERNAL', 'EXTERNAL');
 
+CREATE TYPE document_type_enum AS ENUM ('HISTORIA_CLINICA', 'EXAMEN', 'DIAGNOSTICO');
+
 CREATE TYPE report_type_enum AS ENUM ('CLINICAL');
 
 -- ================================================================
@@ -182,15 +184,20 @@ CREATE TABLE appointment_history (
 -- 10. MEDICAL RECORDS
 -- ================================================================
 CREATE TABLE medical_records (
-  id          UUID                       PRIMARY KEY DEFAULT uuid_generate_v4(),
-  patient_id  UUID                       NOT NULL,
-  uploaded_by UUID,
-  file_url    TEXT                       NOT NULL,
-  file_hash   TEXT,
-  source      medical_record_source_enum,
-  created_at  TIMESTAMP                  DEFAULT NOW(),
-  CONSTRAINT fk_record_patient FOREIGN KEY (patient_id)  REFERENCES patients(id),
-  CONSTRAINT fk_record_user    FOREIGN KEY (uploaded_by) REFERENCES users(id)
+  id            UUID                       PRIMARY KEY DEFAULT uuid_generate_v4(),
+  patient_id    UUID                       NOT NULL,
+  uploaded_by   UUID,
+  file_url      TEXT                       NOT NULL,
+  file_name     TEXT,
+  file_hash     TEXT,
+  source        medical_record_source_enum,
+  document_type document_type_enum,
+  validated_by  UUID,
+  validated_at  TIMESTAMP,
+  created_at    TIMESTAMP                  DEFAULT NOW(),
+  CONSTRAINT fk_record_patient   FOREIGN KEY (patient_id)   REFERENCES patients(id),
+  CONSTRAINT fk_record_user      FOREIGN KEY (uploaded_by)  REFERENCES users(id),
+  CONSTRAINT fk_record_validator FOREIGN KEY (validated_by) REFERENCES users(id)
 );
 
 CREATE INDEX idx_medical_record_patient ON medical_records (patient_id);
