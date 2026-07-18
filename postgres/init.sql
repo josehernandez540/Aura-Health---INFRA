@@ -644,5 +644,11 @@ ADD COLUMN created_at TIMESTAMP DEFAULT NOW();
 ALTER TABLE notifications
 ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
 
+ALTER TABLE notifications
+ADD COLUMN read_at TIMESTAMP;
+
 CREATE INDEX idx_notifications_entity
 ON notifications(entity_type, entity_id);
+
+CREATE INDEX idx_notifications_user_created
+ON notifications(user_id, created_at);
