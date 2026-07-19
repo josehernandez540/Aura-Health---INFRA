@@ -638,14 +638,6 @@ VALUES
 --   dr.martinez@aura.com → DOCTOR   → contraseña: Admin123! (debe cambiarla)
 --   dr.lopez@aura.com    → DOCTOR   → contraseña: Admin123! (inactivo)
 --
--- Las citas de arriba son solo 5 ejemplos con fechas futuras fijas (para no
--- romper validaciones en pruebas manuales). Para poblar /analiticas con datos
--- históricos realistas (cientos de citas con fechas pasadas, ya resueltas),
--- corre después de levantar el stack:
---   docker exec aura_backend node scripts/seed-historical-appointments.js
--- Es idempotente (se salta si ya hay filas marcadas [SEED-HIST]) y usa los
--- médicos/pacientes activos que existan en ese momento, así que no necesita
--- tocarse aunque se agreguen más desde la UI.
 -- ================================================================
 
 ALTER TABLE notifications
