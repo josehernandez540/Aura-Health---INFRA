@@ -62,7 +62,7 @@ CREATE TYPE medical_record_source_enum AS ENUM ('INTERNAL', 'EXTERNAL');
 
 CREATE TYPE document_type_enum AS ENUM ('HISTORIA_CLINICA', 'EXAMEN', 'DIAGNOSTICO');
 
-CREATE TYPE report_type_enum AS ENUM ('CLINICAL');
+CREATE TYPE report_type_enum AS ENUM ('CLINICAL', 'CONSOLIDATED');
 
 -- ================================================================
 -- 3. ROLES
@@ -80,6 +80,7 @@ CREATE TABLE users (
   id                   UUID      PRIMARY KEY DEFAULT uuid_generate_v4(),
   email                TEXT      UNIQUE NOT NULL,
   password             TEXT      NOT NULL,
+  name                 TEXT,                              -- ← nombre de perfil (solo ADMIN; los DOCTOR usan doctors.name)
   role_id              UUID      NOT NULL,
   is_active            BOOLEAN   DEFAULT TRUE,
   must_change_password BOOLEAN   DEFAULT FALSE,        -- ← nullable, igual que Prisma
@@ -636,6 +637,15 @@ VALUES
 --   dr.garcia@aura.com   → DOCTOR   → contraseña: Admin123!
 --   dr.martinez@aura.com → DOCTOR   → contraseña: Admin123! (debe cambiarla)
 --   dr.lopez@aura.com    → DOCTOR   → contraseña: Admin123! (inactivo)
+--
+-- Las citas de arriba son solo 5 ejemplos con fechas futuras fijas (para no
+-- romper validaciones en pruebas manuales). Para poblar /analiticas con datos
+-- históricos realistas (cientos de citas con fechas pasadas, ya resueltas),
+-- corre después de levantar el stack:
+--   docker exec aura_backend node scripts/seed-historical-appointments.js
+-- Es idempotente (se salta si ya hay filas marcadas [SEED-HIST]) y usa los
+-- médicos/pacientes activos que existan en ese momento, así que no necesita
+-- tocarse aunque se agreguen más desde la UI.
 -- ================================================================
 
 ALTER TABLE notifications
